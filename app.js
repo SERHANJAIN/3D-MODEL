@@ -40,9 +40,13 @@ function resolveFileUrl(value) {
   }
   if (typeof value !== 'string') return null;
   if (/^https?:\/\//i.test(value)) return value;
+  // Gradio File outputs may already contain the file-serving route in their URL.
+  if (value.startsWith('/gradio_api/file=')) return HF_SPACE_BASE + value;
+  if (value.startsWith('/file=')) return HF_SPACE_BASE + '/gradio_api' + value;
   if (value.startsWith('/static/')) return HF_SPACE_BASE + value;
-  if (value.startsWith('/')) return `${HF_SPACE_BASE}/gradio_api/file=${encodeURIComponent(value)}`;
-  if (/\.glb(?:$|\?)/i.test(value)) return `${HF_SPACE_BASE}/gradio_api/file=${encodeURIComponent(value)}`;
+  // Raw server file paths (e.g. /tmp/gradio/...) are served using this route.
+  if (value.startsWith('/')) return `${HF_SPACE_BASE}/gradio_api/file=${value}`;
+  if (/\.glb(?:$|\?)/i.test(value)) return `${HF_SPACE_BASE}/gradio_api/file=${value}`;
   return null;
 }
 
@@ -294,19 +298,12 @@ async function generateModel() {
     if (taskId !== activeTaskId) return;
     els.scanStatusText.textContent = 'SENDING IMAGE TO AI';
     const imageInput = await handle_file(selectedFile);
-    const job = client.submit('/generation_all', [
-      '', imageInput, null, null, null, null,
+    // predict() resolves to the API response data array; submit() is an async iterator.
+    els.scanStatusText.textContent = 'BUILDING 3D GEOMETRY';
+    const result = await client.predict('/generation_all', [
+      null, imageInput, null, null, null, null,
       5, 5.0, Math.floor(Math.random() * 1000000), 256, true, 8000, true
     ]);
-    if (typeof job.on === 'function') {
-      job.on('status', (status) => {
-        if (taskId !== activeTaskId || !isGenerating || !status) return;
-        const stage = String(status.stage || status.status || '').toLowerCase();
-        if (stage.includes('queue')) els.scanStatusText.textContent = 'WAITING FOR FREE AI GPU';
-        else if (stage.includes('progress')) els.scanStatusText.textContent = status.message || 'BUILDING 3D GEOMETRY';
-      });
-    }
-    const result = typeof job.result === 'function' ? await job.result() : await job;
     if (taskId !== activeTaskId) return;
     const output = Array.isArray(result) ? result : (result?.data || result?.output || []);
     // generation_all returns the textured GLB as its second file output.
