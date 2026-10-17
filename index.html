@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=20261017-r5">
+  <link rel="stylesheet" href="./styles.css?v=local-mac-1">
   <script type="importmap">
-    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/","@gradio/client":"https://cdn.jsdelivr.net/npm/@gradio/client/+esm"}}
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",}}
   </script>
-  <script type="module" src="./app.js?v=20261017-r5"></script>
+  <script type="module" src="./app.js?v=local-mac-1"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -35,7 +35,7 @@
         <div>
           <div class="eyebrow"><span class="eyebrow-line"></span> IMAGE-TO-3D WORKSPACE</div>
           <h1>Photo in. <span>3D out.</span></h1>
-          <p class="intro-copy">Upload one picture. Generate a 3D model. Download your GLB. No setup required.</p>
+          <p class="intro-copy">Upload a picture. Generate a 3D model locally on your Mac. Download the GLB.</p>
         </div>
         <div class="intro-side-note"><span class="note-index">FREE AI</span><span>UPLOAD <i>→</i> DOWNLOAD</span></div>
       </section>
@@ -65,7 +65,7 @@
           <div class="tip-row"><span class="tip-number">A</span><p>Show the whole object, clearly separated from its background.</p></div>
           <div class="tip-row"><span class="tip-number">B</span><p>Use a sharp, well-lit image with visible material details.</p></div>
           <div class="tip-row"><span class="tip-number">C</span><p>A single view estimates hidden surfaces; add views when precision matters.</p></div>
-          <div class="source-bottom"><span class="micro-icon">✳</span><span>YOUR IMAGE IS SENT TO THE AI PROVIDER FOR PROCESSING.</span></div>
+          <div class="source-bottom"><span class="micro-icon">✳</span><span>YOUR IMAGE IS PROCESSED LOCALLY ON THIS MAC.</span></div>
         </aside>
 
         <section class="viewport-panel" aria-label="3D model preview">
@@ -84,7 +84,7 @@
             <div class="viewport-bottom-right"><span id="meshReadout">NO MESH LOADED</span></div>
           </div>
           <div class="viewport-footer">
-            <div class="footer-stat"><span>ENGINE</span><strong>HOSTED AI</strong></div>
+            <div class="footer-stat"><span>ENGINE</span><strong>LOCAL MLX</strong></div>
             <div class="footer-stat"><span>RENDER</span><strong>REAL-TIME PBR</strong></div>
             <div class="footer-stat"><span>OUTPUT</span><strong>GLB · GLTF 2.0</strong></div>
             <div class="footer-status" id="footerStatus"><span class="status-dot"></span><span>WAITING FOR INPUT</span></div>
@@ -118,7 +118,7 @@
             <div class="prompt-counter"><span>GUIDE THE SURFACE FINISH</span><span id="promptCount">0 / 800</span></div>
           </div>
           <div class="settings-spacer"></div>
-          <div class="cost-note"><span class="cost-icon">✳</span><div><strong>Quality takes compute.</strong><p>Generation uses provider credits. Check your account's current pricing before large batches.</p></div></div>
+          <div class="cost-note"><span class="cost-icon">✳</span><div><strong>Free local generation.</strong><p>Your Mac runs the open-source model. First use downloads model weights; generation uses your Mac's memory.</p></div></div>
           <button id="generateButton" class="generate-button" type="button" disabled><span class="button-sparkle">✳</span><span id="generateButtonText">GENERATE 3D MODEL</span><span class="button-arrow">↗</span></button>
           <div class="button-caption" id="buttonCaption">ADD AN IMAGE TO BEGIN</div>
         </aside>
@@ -138,8 +138,8 @@
       <button class="modal-close" id="closeHelp" type="button" aria-label="Close setup help">×</button>
       <div class="eyebrow"><span class="eyebrow-line"></span> QUICK SETUP</div>
       <h2 id="helpTitle">Connect your<br><em>generation engine.</em></h2>
-      <p>The interface is hosted on GitHub Pages. Real AI generation needs a Node API deployed separately; your Meshy key stays on that server and is never sent to browser code.</p>
-      <ol class="setup-steps"><li><span>01</span><div>Create a key on the <a href="https://www.meshy.ai/" target="_blank" rel="noreferrer">Meshy developer platform ↗</a>.</div></li><li><span>02</span><div>Deploy this repository's <code>server.js</code> to Render using <code>render.yaml</code>, and add <code>MESHY_API_KEY</code> as a server secret.</div></li><li><span>03</span><div>Set the <code>formforge-api-base</code> meta tag in <code>index.html</code> to your deployed service URL, then commit. Leave off the <code>/api</code> suffix.</div></li></ol>
+      <p>FormForge uses an open-source AI model running on your own Apple Silicon Mac. No paid API key or shared demo quota is needed. Keep the local server running while generating.</p>
+      <ol class="setup-steps"><li><span>01</span><div>Run <code>bash install.command</code> once in Terminal to install the local engine.</div></li><li><span>02</span><div>Whenever you want to generate, run <code>bash start.command</code> and keep its Terminal window open.</div></li><li><span>03</span><div>Use <code>http://127.0.0.1:8765</code>. First generation downloads several GB of model weights.</div></li></ol>
       <div class="modal-footnote"><span class="status-dot"></span><span id="modalApiStatus">Checking server configuration…</span></div>
     </div>
   </div>
