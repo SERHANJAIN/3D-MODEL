@@ -8,7 +8,7 @@ for candidate in python3.12 python3.11 python3; do
   if command -v "$candidate" >/dev/null 2>&1; then
     VERSION=$("$candidate" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
     MAJOR=${VERSION%%.*}; MINOR=${VERSION#*.}
-    if [ "$MAJOR" -ge 3 ] && [ "$MINOR" -ge 10 ]; then PYTHON="$candidate"; break; fi
+    if [ "$MAJOR" -eq 3 ] && [ "$MINOR" -ge 10 ] && [ "$MINOR" -le 12 ]; then PYTHON="$candidate"; break; fi
   fi
 done
 if [ -z "$PYTHON" ]; then
