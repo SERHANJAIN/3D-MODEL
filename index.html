@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0c0d">
+  <meta name="description" content="Turn a single image into a richly textured 3D asset. Generate detailed models and export GLB from FormForge Studio.">
+  <title>FormForge — Image to 3D Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+  </script>
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="FormForge home">
+        <span class="brand-mark"><span></span><span></span><span></span><span></span></span>
+        <span>FORM<span class="brand-light">FORGE</span></span>
+        <span class="brand-edition">STUDIO / 01</span>
+      </a>
+      <div class="topbar-right">
+        <span class="saved-state"><span class="status-dot"></span><span id="apiStatusText">CHECKING ENGINE</span></span>
+        <a class="docs-link" href="https://docs.meshy.ai/en/api/image-to-3d" target="_blank" rel="noreferrer">ENGINE DOCS <span>↗</span></a>
+        <button class="icon-button" id="helpButton" type="button" aria-label="Setup help" title="Setup help">?</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro-row">
+        <div>
+          <div class="eyebrow"><span class="eyebrow-line"></span> IMAGE-TO-3D WORKSPACE</div>
+          <h1>Make it <span>real.</span></h1>
+          <p class="intro-copy">One image in. A world of detail out.</p>
+        </div>
+        <div class="intro-side-note"><span class="note-index">01 / 03</span><span>UPLOAD <i>→</i> GENERATE <i>→</i> EXPORT</span></div>
+      </section>
+
+      <section class="workspace" aria-label="3D generation workspace">
+        <aside class="panel source-panel">
+          <div class="panel-heading">
+            <div><span class="panel-index">01</span><h2>Source image</h2></div>
+            <span class="tiny-counter">INPUT</span>
+          </div>
+          <div class="upload-zone" id="dropZone" role="button" tabindex="0" aria-label="Choose or drop an image">
+            <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+            <div class="upload-content" id="uploadPrompt">
+              <div class="upload-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <strong>Drop your image here</strong>
+              <span>or <u>browse files</u></span>
+              <div class="file-pills"><span>JPG</span><span>PNG</span><span>WEBP</span></div>
+            </div>
+            <div class="upload-preview hidden" id="uploadPreview">
+              <img id="sourceImage" alt="Uploaded source reference">
+              <div class="image-overlay"><span class="file-ready"><span class="status-dot"></span> IMAGE READY</span><button type="button" id="removeImage" class="remove-image" aria-label="Remove image">×</button></div>
+            </div>
+          </div>
+          <div class="upload-foot"><span>MAX FILE SIZE</span><span>20 MB</span></div>
+          <div class="source-divider"></div>
+          <div class="mini-heading">BETTER INPUT. BETTER GEOMETRY.</div>
+          <div class="tip-row"><span class="tip-number">A</span><p>Show the whole object, clearly separated from its background.</p></div>
+          <div class="tip-row"><span class="tip-number">B</span><p>Use a sharp, well-lit image with visible material details.</p></div>
+          <div class="tip-row"><span class="tip-number">C</span><p>A single view estimates hidden surfaces; add views when precision matters.</p></div>
+          <div class="source-bottom"><span class="micro-icon">✳</span><span>YOUR IMAGE IS SENT TO THE AI PROVIDER FOR PROCESSING.</span></div>
+        </aside>
+
+        <section class="viewport-panel" aria-label="3D model preview">
+          <div class="viewport-topline">
+            <div class="viewport-label"><span class="live-pip" id="viewportPip"></span><span id="viewportTitle">3D VIEWPORT</span><span class="viewport-chip" id="viewportMode">STANDBY</span></div>
+            <div class="viewport-tools"><button type="button" id="resetView" class="view-tool" title="Reset camera">↺ <span>RESET</span></button><button type="button" id="rotateToggle" class="view-tool active" title="Toggle auto-rotate">⟳ <span>AUTO ROTATE</span></button></div>
+          </div>
+          <div class="canvas-wrap" id="canvasWrap">
+            <canvas id="modelCanvas" aria-label="Interactive 3D model. Drag to orbit and scroll to zoom."></canvas>
+            <div class="empty-state" id="emptyState">
+              <div class="empty-orbit orbit-one"></div><div class="empty-orbit orbit-two"></div>
+              <div class="empty-copy"><div class="empty-glyph">◈</div><span class="empty-kicker">YOUR CANVAS IS READY</span><strong>Every angle.<br><em>Every detail.</em></strong><p>Upload a reference image to start building your 3D asset.</p></div>
+            </div>
+            <div class="scan-overlay hidden" id="scanOverlay"><div class="scan-ring scan-ring-a"></div><div class="scan-ring scan-ring-b"></div><div class="scan-line"></div><div class="scan-status"><span class="scan-spinner"></span><span id="scanStatusText">BUILDING GEOMETRY</span><strong id="scanProgress">0%</strong></div></div>
+            <div class="viewport-bottom-left"><span class="axis-icon">✣</span><span>ORBIT <b>·</b> ZOOM <b>·</b> PAN</span></div>
+            <div class="viewport-bottom-right"><span id="meshReadout">NO MESH LOADED</span></div>
+          </div>
+          <div class="viewport-footer">
+            <div class="footer-stat"><span>ENGINE</span><strong>AI / MESHY 7.1</strong></div>
+            <div class="footer-stat"><span>RENDER</span><strong>REAL-TIME PBR</strong></div>
+            <div class="footer-stat"><span>OUTPUT</span><strong>GLB · GLTF 2.0</strong></div>
+            <div class="footer-status" id="footerStatus"><span class="status-dot"></span><span>WAITING FOR INPUT</span></div>
+          </div>
+        </section>
+
+        <aside class="panel settings-panel">
+          <div class="panel-heading settings-heading">
+            <div><span class="panel-index">02</span><h2>Build settings</h2></div>
+            <span class="settings-sliders">☷</span>
+          </div>
+          <div class="setting-block">
+            <div class="field-label"><label for="qualitySelect">GEOMETRY DETAIL</label><span class="recommended">RECOMMENDED</span></div>
+            <div class="quality-options" role="group" aria-label="Geometry detail">
+              <button class="quality-option" type="button" data-quality="2k" aria-pressed="true"><span class="quality-top">2K</span><span class="quality-bottom">HIGH DETAIL</span><span class="quality-check">✓</span></button>
+              <button class="quality-option" type="button" data-quality="4k" aria-pressed="false"><span class="quality-top">4K</span><span class="quality-bottom">ULTRA DETAIL</span><span class="quality-check">✓</span></button>
+            </div>
+            <p class="field-help">Higher geometry resolution can preserve finer shape detail and may take longer.</p>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-block">
+            <div class="field-label"><span>TEXTURE & MATERIALS</span><span class="on-label">ON</span></div>
+            <label class="toggle-row"><span class="toggle-copy"><strong>Photorealistic texture</strong><small>AI-generated surface color & detail</small></span><input id="textureToggle" type="checkbox" checked><span class="toggle-track"></span></label>
+            <label class="toggle-row"><span class="toggle-copy"><strong>PBR material maps</strong><small>Metallic, roughness & normal data</small></span><input id="pbrToggle" type="checkbox" checked><span class="toggle-track"></span></label>
+            <p class="field-help compact">The high-quality preset uses textures and PBR maps for realistic materials. These options are sent with generation settings.</p>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-block prompt-block">
+            <div class="field-label"><label for="materialPrompt">MATERIAL DIRECTION <span class="optional">OPTIONAL</span></label></div>
+            <textarea id="materialPrompt" rows="3" maxlength="800" placeholder="e.g. brushed aluminum, subtle wear, soft studio reflections…"></textarea>
+            <div class="prompt-counter"><span>GUIDE THE SURFACE FINISH</span><span id="promptCount">0 / 800</span></div>
+          </div>
+          <div class="settings-spacer"></div>
+          <div class="cost-note"><span class="cost-icon">✳</span><div><strong>Quality takes compute.</strong><p>Generation uses provider credits. Check your account's current pricing before large batches.</p></div></div>
+          <button id="generateButton" class="generate-button" type="button" disabled><span class="button-sparkle">✳</span><span id="generateButtonText">GENERATE 3D MODEL</span><span class="button-arrow">↗</span></button>
+          <div class="button-caption" id="buttonCaption">ADD AN IMAGE TO BEGIN</div>
+        </aside>
+      </section>
+
+      <section class="bottom-row">
+        <div class="workflow-note"><span class="workflow-icon">⌘</span><div><strong>Built for artists, makers & product teams.</strong><span>From visual concept to a portable 3D asset.</span></div></div>
+        <div class="export-area"><div class="export-copy"><span class="export-mini-label">READY WHEN YOU ARE</span><strong id="exportTitle">Your model will appear here</strong><span id="exportDescription">Generate to unlock your GLB export.</span></div><button id="exportButton" class="export-button" type="button" disabled><span>↓</span> EXPORT GLB <small>↗</small></button></div>
+      </section>
+    </main>
+    <footer class="page-footer"><span>FORMFORGE STUDIO <span class="footer-muted">/ IMAGE-TO-3D</span></span><span>MADE FOR DETAIL <span class="footer-star">✳</span></span><span class="footer-muted">LOCAL PREVIEW · CLOUD GENERATION</span></footer>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="modal-backdrop hidden" id="helpModal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="help-modal">
+      <button class="modal-close" id="closeHelp" type="button" aria-label="Close setup help">×</button>
+      <div class="eyebrow"><span class="eyebrow-line"></span> QUICK SETUP</div>
+      <h2 id="helpTitle">Connect your<br><em>generation engine.</em></h2>
+      <p>FormForge's interface and viewer run locally. To generate real AI meshes, connect a Meshy API key; the key stays on the server and is never sent to the browser.</p>
+      <ol class="setup-steps"><li><span>01</span><div>Get an API key from the <a href="https://www.meshy.ai/" target="_blank" rel="noreferrer">Meshy developer platform ↗</a>.</div></li><li><span>02</span><div>Copy <code>.env.example</code> to <code>.env</code> and fill in <code>MESHY_API_KEY</code>.</div></li><li><span>03</span><div>Run <code>npm install</code>, then <code>npm start</code> and open <code>http://localhost:3000</code>.</div></li></ol>
+      <div class="modal-footnote"><span class="status-dot"></span><span id="modalApiStatus">Checking server configuration…</span></div>
+    </div>
+  </div>
+</body>
+</html>
