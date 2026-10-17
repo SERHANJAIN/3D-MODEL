@@ -4,17 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f4f0">
-  <meta name="description" content="Turn one image into a richly textured 3D model with FormForge Studio and export it as GLB.">
-  <meta name="formforge-api-base" content="">
-  <title>FormForge — Image to 3D Studio</title>
+  <meta name="description" content="Upload a picture, generate a photorealistic 3D model, and download it as a GLB. No setup required.">
+    <title>FormForge — Photo to 3D</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=20261017-final">
+  <link rel="stylesheet" href="./styles.css?v=20261017-simple">
   <script type="importmap">
     {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/","@gradio/client":"https://cdn.jsdelivr.net/npm/@gradio/client/+esm"}}
   </script>
-  <script type="module" src="./app.js?v=20261017-final"></script>
+  <script type="module" src="./app.js?v=20261017-simple"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -26,8 +25,8 @@
       </a>
       <div class="topbar-right">
         <span class="saved-state"><span class="status-dot"></span><span id="apiStatusText">CHECKING ENGINE</span></span>
-        <a class="docs-link" href="https://docs.meshy.ai/en/api/image-to-3d" target="_blank" rel="noreferrer">ENGINE DOCS <span>↗</span></a>
-        <button class="icon-button" id="helpButton" type="button" aria-label="Setup help" title="Setup help">?</button>
+        
+        <button class="icon-button" id="helpButton" type="button" aria-label="Help" title="Help">?</button>
       </div>
     </header>
 
