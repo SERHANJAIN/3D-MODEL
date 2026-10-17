@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { Client, handle_file } from '@gradio/client';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -14,6 +15,8 @@ const els = {
   exportTitle: $('exportTitle'), exportDescription: $('exportDescription'), toast: $('toast'), helpButton: $('helpButton'),
   helpModal: $('helpModal'), closeHelp: $('closeHelp'), modalApiStatus: $('modalApiStatus')
 };
+const generateArea = $('generateArea');
+if (generateArea) generateArea.append(els.generateButton, els.buttonCaption);
 
 const HF_SPACE = 'tencent/Hunyuan3D-2.1';
 const HF_SPACE_BASE = 'https://tencent-hunyuan3d-2-1.hf.space';
@@ -292,7 +295,7 @@ async function generateModel() {
     els.scanStatusText.textContent = 'SENDING IMAGE TO AI';
     const imageInput = await handle_file(selectedFile);
     const job = client.submit('/generation_all', [
-      null, imageInput, null, null, null, null,
+      '', imageInput, null, null, null, null,
       5, 5.0, Math.floor(Math.random() * 1000000), 256, true, 8000, true
     ]);
     if (typeof job.on === 'function') {
