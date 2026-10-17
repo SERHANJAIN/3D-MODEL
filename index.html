@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css?v=20261017-final">
   <script type="importmap">
-    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/","@gradio/client":"https://cdn.jsdelivr.net/npm/@gradio/client/+esm"}}
   </script>
   <script type="module" src="./app.js?v=20261017-final"></script>
 </head>
@@ -35,10 +35,10 @@
       <section class="intro-row">
         <div>
           <div class="eyebrow"><span class="eyebrow-line"></span> IMAGE-TO-3D WORKSPACE</div>
-          <h1>Make it <span>real.</span></h1>
-          <p class="intro-copy">One image in. A detailed, textured 3D asset out.</p>
+          <h1>Photo in. <span>3D out.</span></h1>
+          <p class="intro-copy">Upload one picture. Generate a 3D model. Download your GLB. No setup required.</p>
         </div>
-        <div class="intro-side-note"><span class="note-index">01 / 03</span><span>UPLOAD <i>→</i> GENERATE <i>→</i> EXPORT</span></div>
+        <div class="intro-side-note"><span class="note-index">FREE AI</span><span>UPLOAD <i>→</i> DOWNLOAD</span></div>
       </section>
 
       <section class="workspace" aria-label="3D generation workspace">
@@ -60,7 +60,7 @@
               <div class="image-overlay"><span class="file-ready"><span class="status-dot"></span> IMAGE READY</span><button type="button" id="removeImage" class="remove-image" aria-label="Remove image">×</button></div>
             </div>
           </div>
-          <div class="upload-foot"><span>MAX FILE SIZE</span><span>20 MB</span></div>
+          <div class="upload-foot"><span>IMAGE FORMAT</span><span>JPG · PNG · WEBP</span></div><div id="generateArea"></div>
           <div class="source-divider"></div>
           <div class="mini-heading">BETTER INPUT. BETTER GEOMETRY.</div>
           <div class="tip-row"><span class="tip-number">A</span><p>Show the whole object, clearly separated from its background.</p></div>
@@ -78,14 +78,14 @@
             <canvas id="modelCanvas" aria-label="Interactive 3D model. Drag to orbit and scroll to zoom."></canvas>
             <div class="empty-state" id="emptyState">
               <div class="empty-orbit orbit-one"></div><div class="empty-orbit orbit-two"></div>
-              <div class="empty-copy"><div class="empty-glyph">◈</div><span class="empty-kicker">YOUR CANVAS IS READY</span><strong>Every angle.<br><em>Every detail.</em></strong><p>Upload a reference image to start building your 3D asset.</p></div>
+              <div class="empty-copy"><div class="empty-glyph">◈</div><span class="empty-kicker">YOUR CANVAS IS READY</span><strong>Every angle.<br><em>Every detail.</em></strong><p>Upload a photo to turn it into a 3D model.</p></div>
             </div>
             <div class="scan-overlay hidden" id="scanOverlay"><div class="scan-ring scan-ring-a"></div><div class="scan-ring scan-ring-b"></div><div class="scan-line"></div><div class="scan-status"><span class="scan-spinner"></span><span id="scanStatusText">BUILDING GEOMETRY</span><strong id="scanProgress">0%</strong></div></div>
             <div class="viewport-bottom-left"><span class="axis-icon">✣</span><span>ORBIT <b>·</b> ZOOM <b>·</b> PAN</span></div>
             <div class="viewport-bottom-right"><span id="meshReadout">NO MESH LOADED</span></div>
           </div>
           <div class="viewport-footer">
-            <div class="footer-stat"><span>ENGINE</span><strong>AI / MESHY 7.1</strong></div>
+            <div class="footer-stat"><span>ENGINE</span><strong>HOSTED AI</strong></div>
             <div class="footer-stat"><span>RENDER</span><strong>REAL-TIME PBR</strong></div>
             <div class="footer-stat"><span>OUTPUT</span><strong>GLB · GLTF 2.0</strong></div>
             <div class="footer-status" id="footerStatus"><span class="status-dot"></span><span>WAITING FOR INPUT</span></div>
@@ -130,7 +130,7 @@
         <div class="export-area"><div class="export-copy"><span class="export-mini-label">READY WHEN YOU ARE</span><strong id="exportTitle">Your model will appear here</strong><span id="exportDescription">Generate to unlock your GLB export.</span></div><button id="exportButton" class="export-button" type="button" disabled><span>↓</span> EXPORT GLB <small>↗</small></button></div>
       </section>
     </main>
-    <footer class="page-footer"><span>FORMFORGE STUDIO <span class="footer-muted">/ IMAGE-TO-3D</span></span><span>MADE FOR DETAIL <span class="footer-star">✳</span></span><span class="footer-muted">LOCAL PREVIEW · CLOUD GENERATION</span></footer>
+    <footer class="page-footer"><span>FORMFORGE STUDIO <span class="footer-muted">/ IMAGE-TO-3D</span></span><span>MADE FOR DETAIL <span class="footer-star">✳</span></span><span class="footer-muted">UPLOAD · GENERATE · DOWNLOAD</span></footer>
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
