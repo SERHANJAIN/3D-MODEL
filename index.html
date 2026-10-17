@@ -139,8 +139,8 @@
       <button class="modal-close" id="closeHelp" type="button" aria-label="Close setup help">×</button>
       <div class="eyebrow"><span class="eyebrow-line"></span> QUICK SETUP</div>
       <h2 id="helpTitle">Connect your<br><em>generation engine.</em></h2>
-      <p>FormForge's interface and viewer run locally. To generate real AI meshes, connect a Meshy API key; the key stays on the server and is never sent to the browser.</p>
-      <ol class="setup-steps"><li><span>01</span><div>Get an API key from the <a href="https://www.meshy.ai/" target="_blank" rel="noreferrer">Meshy developer platform ↗</a>.</div></li><li><span>02</span><div>Copy <code>.env.example</code> to <code>.env</code> and fill in <code>MESHY_API_KEY</code>.</div></li><li><span>03</span><div>Run <code>npm install</code>, then <code>npm start</code> and open <code>http://localhost:3000</code>.</div></li></ol>
+      <p>The interface is hosted on GitHub Pages. Real AI generation needs a Node API deployed separately; your Meshy key stays on that server and is never sent to browser code.</p>
+      <ol class="setup-steps"><li><span>01</span><div>Create a key on the <a href="https://www.meshy.ai/" target="_blank" rel="noreferrer">Meshy developer platform ↗</a>.</div></li><li><span>02</span><div>Deploy this repository's <code>server.js</code> to Render using <code>render.yaml</code>, and add <code>MESHY_API_KEY</code> as a server secret.</div></li><li><span>03</span><div>Set the <code>formforge-api-base</code> meta tag in <code>index.html</code> to your deployed service URL, then commit. Leave off the <code>/api</code> suffix.</div></li></ol>
       <div class="modal-footnote"><span class="status-dot"></span><span id="modalApiStatus">Checking server configuration…</span></div>
     </div>
   </div>
