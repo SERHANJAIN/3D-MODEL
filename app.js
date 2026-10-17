@@ -15,17 +15,40 @@ const els = {
   helpModal: $('helpModal'), closeHelp: $('closeHelp'), modalApiStatus: $('modalApiStatus')
 };
 
-const API_BASE = (document.querySelector('meta[name="formforge-api-base"]')?.content || '').trim().replace(/\/+$/, '');
-function apiUrl(path) {
-  const cleanPath = String(path).replace(/^\/+/, '');
-  if (API_BASE) return new URL(cleanPath, API_BASE + '/').toString();
-  return new URL(cleanPath, document.baseURI).toString();
+const HF_SPACE = 'tencent/Hunyuan3D-2.1';
+const HF_SPACE_BASE = 'https://tencent-hunyuan3d-2-1.hf.space';
+let hfClientPromise = null;
+function getHFClient() {
+  if (!hfClientPromise) hfClientPromise = Client.connect(HF_SPACE);
+  return hfClientPromise;
+}
+function resolveFileUrl(value) {
+  if (!value) return null;
+  if (Array.isArray(value)) {
+    for (const item of value) { const result = resolveFileUrl(item); if (result) return result; }
+    return null;
+  }
+  if (typeof value === 'object') {
+    if (value.url) return resolveFileUrl(value.url);
+    if (value.path) return resolveFileUrl(value.path);
+    if (value.value) return resolveFileUrl(value.value);
+    if (value.data) return resolveFileUrl(value.data);
+    return null;
+  }
+  if (typeof value !== 'string') return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith('/static/')) return HF_SPACE_BASE + value;
+  if (value.startsWith('/')) return `${HF_SPACE_BASE}/gradio_api/file=${encodeURIComponent(value)}`;
+  if (/\.glb(?:$|\?)/i.test(value)) return `${HF_SPACE_BASE}/gradio_api/file=${encodeURIComponent(value)}`;
+  return null;
 }
 
 let selectedFile = null;
 let sourceDataUrl = null;
 let selectedQuality = '2k';
 let activeTaskId = null;
+let generatedModelUrl = null;
+let generatedModelName = 'formforge-model.glb';
 let pollTimer = null;
 let toastTimer = null;
 let isGenerating = false;
@@ -119,39 +142,10 @@ function showToast(message, isError = false) {
   toastTimer = setTimeout(() => els.toast.classList.remove('show'), 4200);
 }
 
-async function checkConfig() {
-  try {
-    const response = await fetch(apiUrl('api/config'), { headers: { Accept: 'application/json' } });
-    if (!response.ok) throw new Error(`API status ${response.status}`);
-    const contentType = response.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) throw new Error('The API did not return JSON.');
-    const cfg = await response.json();
-    const status = document.querySelector('.saved-state');
-    if (cfg.configured) {
-      els.apiStatusText.textContent = 'ENGINE CONNECTED';
-      status.classList.remove('config-error');
-      els.modalApiStatus.textContent = 'Meshy is connected. Image-to-3D generation and GLB export are enabled.';
-      els.buttonCaption.textContent = selectedFile ? 'READY TO BUILD · PROVIDER CREDITS APPLY' : 'ADD AN IMAGE TO BEGIN';
-      window.formforgeConfigured = true;
-    } else {
-      els.apiStatusText.textContent = 'ADD API KEY';
-      status.classList.add('config-error');
-      els.modalApiStatus.textContent = 'The API server is reachable, but MESHY_API_KEY has not been configured on that server.';
-      els.buttonCaption.textContent = selectedFile ? 'ADD MESHY API KEY ON THE SERVER' : 'ADD AN IMAGE TO BEGIN';
-      window.formforgeConfigured = false;
-    }
-  } catch {
-    const pagesOnly = location.hostname.endsWith('github.io') && !API_BASE;
-    els.apiStatusText.textContent = pagesOnly ? 'API NOT DEPLOYED' : 'SERVER OFFLINE';
-    document.querySelector('.saved-state').classList.add('config-error');
-    els.modalApiStatus.textContent = pagesOnly
-      ? 'GitHub Pages serves the frontend only. Deploy server.js to a Node host, add MESHY_API_KEY as a server secret, then set the formforge-api-base meta tag to the deployed URL.'
-      : 'Could not reach the generation API. Start the Node server with npm start, or check the API URL configured in index.html.';
-    els.buttonCaption.textContent = selectedFile ? 'CONNECT THE GENERATION API TO BUILD' : 'ADD AN IMAGE TO BEGIN';
-    window.formforgeConfigured = false;
-  }
-}
-checkConfig();
+// The hosted public inference Space does the generation; no Node server or user API key is needed.
+window.formforgeConfigured = true;
+els.apiStatusText.textContent = 'READY';
+els.buttonCaption.textContent = 'ADD AN IMAGE TO BEGIN';
 
 function humanSize(bytes) { return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }
 function setImage(file) {
@@ -168,7 +162,7 @@ function setImage(file) {
     els.uploadPrompt.classList.add('hidden');
     els.uploadPreview.classList.remove('hidden');
     els.generateButton.disabled = false;
-    els.buttonCaption.textContent = window.formforgeConfigured ? `${file.name.toUpperCase()} · READY TO BUILD` : 'CONNECT MESHY API TO GENERATE';
+    els.buttonCaption.textContent = 'READY TO GENERATE';
     els.exportTitle.textContent = 'Source loaded';
     els.exportDescription.textContent = `${file.name} · ${humanSize(file.size)}. Generate to create your 3D mesh.`;
     setViewportState('IMAGE LOADED', 'SOURCE READY');
@@ -184,7 +178,7 @@ for (const type of ['dragleave', 'drop']) els.dropZone.addEventListener(type, (e
 els.dropZone.addEventListener('drop', (event) => setImage(event.dataTransfer?.files?.[0]));
 els.removeImage.addEventListener('click', (event) => {
   event.stopPropagation();
-  selectedFile = null; sourceDataUrl = null; activeTaskId = null;
+  selectedFile = null; sourceDataUrl = null; activeTaskId = null; generatedModelUrl = null;
   els.sourceImage.removeAttribute('src'); els.uploadPreview.classList.add('hidden'); els.uploadPrompt.classList.remove('hidden');
   els.generateButton.disabled = true; els.exportButton.disabled = true;
   els.exportTitle.textContent = 'Your model will appear here'; els.exportDescription.textContent = 'Generate to unlock your GLB export.';
@@ -235,10 +229,10 @@ function disposeObject(root) {
   });
 }
 function fmtCount(n) { return n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n); }
-function loadModel(taskId) {
+function loadModel(modelUrl) {
   return new Promise((resolve, reject) => {
     const loader = new GLTFLoader();
-    loader.load(apiUrl(`api/model/${encodeURIComponent(taskId)}`), (gltf) => {
+    loader.load(modelUrl, (gltf) => {
       const model = gltf.scene;
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
@@ -263,81 +257,97 @@ function loadModel(taskId) {
 
 async function generateModel() {
   if (!selectedFile || !sourceDataUrl || isGenerating) return;
-  if (!window.formforgeConfigured) {
-    openHelp(); showToast('Connect your Meshy API key to start real 3D generation.', true); return;
-  }
-  isGenerating = true; currentProgress = 0;
+  isGenerating = true;
+  currentProgress = 4;
+  const taskId = `job-${Date.now()}`;
+  activeTaskId = taskId;
+  generatedModelUrl = null;
   els.generateButton.disabled = true;
-  els.generateButtonText.textContent = 'STARTING ENGINE…';
-  els.buttonCaption.textContent = 'SENDING SOURCE TO THE GENERATION ENGINE';
+  els.generateButtonText.textContent = 'GENERATING YOUR MODEL…';
+  els.buttonCaption.textContent = 'YOUR IMAGE IS BEING CONVERTED IN THE CLOUD';
   els.emptyState.classList.add('hidden');
   els.scanOverlay.classList.remove('hidden');
   els.exportButton.disabled = true;
-  els.exportTitle.textContent = 'Generating your model…';
-  els.exportDescription.textContent = `Building ${selectedQuality.toUpperCase()} geometry and material maps.`;
-  setViewportState('GENERATING', 'BUILDING GEOMETRY');
-  els.scanStatusText.textContent = 'BUILDING GEOMETRY';
+  els.exportTitle.textContent = 'Creating your 3D model…';
+  els.exportDescription.textContent = 'This usually takes a little while. Keep this page open.';
+  setViewportState('GENERATING', 'BUILDING YOUR MODEL');
+  els.scanStatusText.textContent = 'PREPARING YOUR IMAGE';
+  els.scanProgress.textContent = '4%';
+
+  const advanceProgress = () => {
+    if (!isGenerating || taskId !== activeTaskId) return;
+    currentProgress = Math.min(92, currentProgress + 6);
+    els.scanProgress.textContent = `${Math.round(currentProgress)}%`;
+    els.scanStatusText.textContent = currentProgress < 28 ? 'PREPARING YOUR IMAGE'
+      : currentProgress < 58 ? 'BUILDING 3D GEOMETRY'
+      : currentProgress < 84 ? 'ADDING SURFACE DETAIL'
+      : 'PACKAGING GLB FILE';
+    pollTimer = setTimeout(advanceProgress, 4500);
+  };
+  pollTimer = setTimeout(advanceProgress, 1800);
+
   try {
-    const response = await fetch(apiUrl('api/generate'), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageData: sourceDataUrl, quality: selectedQuality, texturePrompt: els.materialPrompt.value.trim(), texture: els.textureToggle.checked, pbr: els.pbrToggle.checked })
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Could not start generation.');
-    activeTaskId = data.taskId;
-    showToast('Generation started. Your model is being built in the cloud.');
-    pollTask(activeTaskId);
+    const client = await getHFClient();
+    if (taskId !== activeTaskId) return;
+    els.scanStatusText.textContent = 'SENDING IMAGE TO AI';
+    const imageInput = await handle_file(selectedFile);
+    const job = client.submit('/generation_all', [
+      null, imageInput, null, null, null, null,
+      5, 5.0, Math.floor(Math.random() * 1000000), 256, true, 8000, true
+    ]);
+    if (typeof job.on === 'function') {
+      job.on('status', (status) => {
+        if (taskId !== activeTaskId || !isGenerating || !status) return;
+        const stage = String(status.stage || status.status || '').toLowerCase();
+        if (stage.includes('queue')) els.scanStatusText.textContent = 'WAITING FOR FREE AI GPU';
+        else if (stage.includes('progress')) els.scanStatusText.textContent = status.message || 'BUILDING 3D GEOMETRY';
+      });
+    }
+    const result = typeof job.result === 'function' ? await job.result() : await job;
+    if (taskId !== activeTaskId) return;
+    const output = Array.isArray(result) ? result : (result?.data || result?.output || []);
+    // generation_all returns the textured GLB as its second file output.
+    let modelUrl = resolveFileUrl(output[1]);
+    if (!modelUrl) modelUrl = resolveFileUrl(output[0]);
+    if (!modelUrl) throw new Error('The AI service finished but did not return a downloadable model. Please try again.');
+    generatedModelUrl = modelUrl;
+    generatedModelName = (selectedFile.name.replace(/\.[^.]+$/, '') || 'formforge-model') + '.glb';
+    currentProgress = 100;
+    els.scanProgress.textContent = '100%';
+    els.scanStatusText.textContent = 'LOADING YOUR MODEL';
+    await installGeneratedModel(modelUrl, taskId);
   } catch (error) {
-    failGeneration(error.message || 'Could not start the generation task.');
+    if (taskId !== activeTaskId) return;
+    const detail = error?.message || 'The free AI service is busy right now. Please try again in a moment.';
+    failGeneration(/quota|zerogpu|queue|busy|rate limit/i.test(detail)
+      ? 'The free AI generator is busy or has reached its shared daily limit. Please try again later.'
+      : detail);
   }
 }
 els.generateButton.addEventListener('click', generateModel);
 
-async function pollTask(taskId) {
-  if (!isGenerating || taskId !== activeTaskId) return;
+async function installGeneratedModel(modelUrl, taskId) {
   try {
-    const response = await fetch(apiUrl(`api/tasks/${encodeURIComponent(taskId)}`));
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Could not check task status.');
-    const reported = Math.max(0, Math.min(100, Number(data.progress || 0)));
-    currentProgress = Math.max(currentProgress, reported);
-    // Keep the UI moving if the provider reports a coarse progress value for a while.
-    els.scanProgress.textContent = `${Math.round(currentProgress)}%`;
-    els.scanStatusText.textContent = currentProgress < 35 ? 'BUILDING GEOMETRY' : currentProgress < 72 ? 'REFINING SURFACES' : currentProgress < 96 ? 'BAKING MATERIALS' : 'FINALIZING GLB';
-    els.meshReadout.textContent = `GENERATION ${Math.round(currentProgress)}%`;
-    if (data.status === 'SUCCEEDED' && data.modelReady) {
-      els.scanProgress.textContent = '100%';
-      els.scanStatusText.textContent = 'LOADING MODEL';
-      await installGeneratedModel(taskId);
-      return;
-    }
-    if (data.status === 'FAILED' || data.status === 'CANCELED') throw new Error(data.error || 'The AI provider could not generate this model.');
-    pollTimer = setTimeout(() => pollTask(taskId), 3500);
-  } catch (error) {
-    failGeneration(error.message || 'An error occurred while checking generation status.');
-  }
-}
-
-async function installGeneratedModel(taskId) {
-  try {
-    const model = await loadModel(taskId);
+    const model = await loadModel(modelUrl);
     if (taskId !== activeTaskId) { disposeObject(model); return; }
     if (loadedModel) { scene.remove(loadedModel); disposeObject(loadedModel); }
     loadedModel = model;
     if (placeholderGroup) placeholderGroup.visible = false;
     scene.add(loadedModel);
     camera.position.set(3.7, 2.25, 4.5); controls.target.set(0, 0.15, 0); controls.update();
-    isGenerating = false; els.scanOverlay.classList.add('hidden'); els.emptyState.classList.add('hidden');
-    els.generateButton.disabled = false; els.generateButtonText.textContent = 'REGENERATE MODEL';
-    els.buttonCaption.textContent = 'READY FOR A NEW ITERATION';
+    isGenerating = false;
+    if (pollTimer) clearTimeout(pollTimer);
+    els.scanOverlay.classList.add('hidden'); els.emptyState.classList.add('hidden');
+    els.generateButton.disabled = false; els.generateButtonText.textContent = 'GENERATE ANOTHER MODEL';
+    els.buttonCaption.textContent = 'READY FOR ANOTHER IMAGE';
     els.exportButton.disabled = false;
     els.exportTitle.textContent = 'Your 3D model is ready';
-    els.exportDescription.textContent = `${fmtCount(Math.round(meshStats.triangles))} triangles · ${meshStats.meshes} mesh parts · GLB`;
+    els.exportDescription.textContent = `${fmtCount(Math.round(meshStats.triangles))} triangles · ${meshStats.meshes} mesh parts · GLB download`;
     setViewportState('MODEL READY', `${fmtCount(Math.round(meshStats.triangles))} TRIANGLES`);
-    showToast('Model generated successfully. GLB export is ready.');
+    showToast('Done! Your 3D model is ready to download.');
   } catch (error) {
-    failGeneration(`The model was generated, but the 3D preview could not load: ${error.message || 'unknown preview error'}. Try exporting the GLB.`);
-    els.exportButton.disabled = false;
+    failGeneration(`The model was generated, but the preview could not load: ${error.message || 'unknown preview error'}. You can still download the GLB.`);
+    els.exportButton.disabled = !generatedModelUrl;
   }
 }
 
@@ -348,20 +358,35 @@ function failGeneration(message) {
   els.emptyState.classList.toggle('hidden', Boolean(loadedModel));
   els.generateButton.disabled = !selectedFile;
   els.generateButtonText.textContent = loadedModel ? 'REGENERATE MODEL' : 'TRY AGAIN';
-  els.buttonCaption.textContent = 'CHECK SETTINGS OR API CONNECTION';
+  els.buttonCaption.textContent = 'PLEASE TRY AGAIN';
   els.exportTitle.textContent = loadedModel ? 'Previous model still available' : 'Generation did not finish';
   els.exportDescription.textContent = message;
   setViewportState('FAILED', 'GENERATION FAILED');
   showToast(message, true);
 }
 
-els.exportButton.addEventListener('click', () => {
-  if (!activeTaskId) return;
-  const link = document.createElement('a');
-  link.href = apiUrl(`api/model/${encodeURIComponent(activeTaskId)}?download=1`);
-  link.download = `formforge-${activeTaskId}.glb`;
-  document.body.appendChild(link); link.click(); link.remove();
-  showToast('Your GLB download has started.');
+els.exportButton.addEventListener('click', async () => {
+  if (!generatedModelUrl) return;
+  try {
+    const response = await fetch(generatedModelUrl);
+    if (!response.ok) throw new Error('Download is temporarily unavailable.');
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = generatedModelName || 'formforge-model.glb';
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+    showToast('Your GLB download has started.');
+  } catch {
+    // The hosted provider normally serves a direct attachment link; use it if CORS blocks a blob download.
+    const link = document.createElement('a');
+    link.href = generatedModelUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    document.body.appendChild(link); link.click(); link.remove();
+    showToast('Opening your model download.');
+  }
 });
 els.resetView.addEventListener('click', () => {
   camera.position.set(4.2, 2.7, 5.7); controls.target.set(0, 0.35, 0); controls.update();
