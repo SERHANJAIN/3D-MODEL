@@ -263,12 +263,12 @@ async function generateModel() {
 
   const advanceProgress = () => {
     if (!isGenerating || taskId !== activeTaskId) return;
-    currentProgress = Math.min(92, currentProgress + 6);
+    currentProgress = Math.min(96, currentProgress + 6);
     els.scanProgress.textContent = `${Math.round(currentProgress)}%`;
     els.scanStatusText.textContent = currentProgress < 28 ? 'PREPARING YOUR IMAGE'
       : currentProgress < 58 ? 'BUILDING 3D GEOMETRY'
       : currentProgress < 84 ? 'ADDING SURFACE DETAIL'
-      : 'PACKAGING GLB FILE';
+      : 'AI ENGINE STILL WORKING · ESTIMATED PROGRESS';
     pollTimer = setTimeout(advanceProgress, 4500);
   };
   pollTimer = setTimeout(advanceProgress, 1800);
