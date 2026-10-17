@@ -5,7 +5,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const $ = (id) => document.getElementById(id);
 const els = {
   apiStatusText: $('apiStatusText'), dropZone: $('dropZone'), fileInput: $('fileInput'), uploadPrompt: $('uploadPrompt'),
-  uploadPreview: $('uploadPreview'), sourceImage: $('sourceImage'), removeImage: $('removeImage'), generateButton: $('generateButton'),
+  uploadPreview: $('uploadPreview'), sourceImagesPreview: $('sourceImagesPreview'), removeImage: $('removeImage'), generateButton: $('generateButton'),
   generateButtonText: $('generateButtonText'), buttonCaption: $('buttonCaption'), qualityOptions: [...document.querySelectorAll('.quality-option')],
   materialPrompt: $('materialPrompt'), promptCount: $('promptCount'), textureToggle: $('textureToggle'), pbrToggle: $('pbrToggle'),
   viewportTitle: $('viewportTitle'), viewportMode: $('viewportMode'), viewportPip: $('viewportPip'), emptyState: $('emptyState'),
@@ -17,9 +17,9 @@ const els = {
 const generateArea = $('generateArea');
 if (generateArea) generateArea.append(els.generateButton, els.buttonCaption);
 
-let selectedFile = null;
-let sourceDataUrl = null;
-let selectedQuality = '2k';
+let selectedFiles = [];
+let sourceDataUrls = [];
+let selectedQuality = 'medium';
 let activeTaskId = null;
 let generatedModelUrl = null;
 let generatedModelName = 'formforge-model.glb';
@@ -131,39 +131,40 @@ fetch('/api/health').then((r) => { if (!r.ok) throw new Error('offline'); return
 });
 
 function humanSize(bytes) { return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }
-function setImage(file) {
-  if (!file) return;
+function setImages(fileList) {
+  const files = [...(fileList || [])];
+  if (!files.length) return;
+  if (files.length > 4) { showToast('Choose up to 4 images of the same object.', true); return; }
   const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-  if (!allowed.includes(file.type)) { showToast('Choose a JPG, PNG or WebP image.', true); return; }
-  if (file.size > 20 * 1024 * 1024) { showToast('Image must be 20 MB or smaller.', true); return; }
-  const reader = new FileReader();
-  reader.onerror = () => showToast('Could not read this image. Please try another file.', true);
-  reader.onload = () => {
-    selectedFile = file;
-    sourceDataUrl = reader.result;
-    els.sourceImage.src = sourceDataUrl;
-    els.uploadPrompt.classList.add('hidden');
-    els.uploadPreview.classList.remove('hidden');
-    const onLocalApp = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-    els.generateButton.disabled = !onLocalApp;
-    els.buttonCaption.textContent = onLocalApp ? 'READY TO GENERATE' : 'OPEN THE LOCAL APP TO GENERATE';
-    els.exportTitle.textContent = 'Source loaded';
-    els.exportDescription.textContent = `${file.name} · ${humanSize(file.size)}. Generate to create your 3D mesh.`;
-    setViewportState('IMAGE LOADED', 'SOURCE READY');
-    showToast(`Source image loaded · ${humanSize(file.size)}`);
-  };
-  reader.readAsDataURL(file);
+  for (const file of files) {
+    if (!allowed.includes(file.type)) { showToast('Choose JPG, PNG or WebP images.', true); return; }
+    if (file.size > 20 * 1024 * 1024) { showToast('Each image must be 20 MB or smaller.', true); return; }
+  }
+  Promise.all(files.map((file) => new Promise((resolve, reject) => {
+    const reader = new FileReader(); reader.onerror = () => reject(new Error('Could not read an image.'));
+    reader.onload = () => resolve({ file, dataUrl: reader.result }); reader.readAsDataURL(file);
+  }))).then((items) => {
+    selectedFiles = items.map(x => x.file); sourceDataUrls = items.map(x => x.dataUrl);
+    els.sourceImagesPreview.replaceChildren();
+    items.forEach(({file,dataUrl}) => { const img=document.createElement('img'); img.src=dataUrl; img.alt=file.name; img.title=file.name; els.sourceImagesPreview.appendChild(img); });
+    els.uploadPrompt.classList.add('hidden'); els.uploadPreview.classList.remove('hidden');
+    const local=['localhost','127.0.0.1'].includes(window.location.hostname);
+    els.generateButton.disabled=!local; els.buttonCaption.textContent=local?'READY TO GENERATE':'OPEN THE LOCAL APP TO GENERATE';
+    els.exportTitle.textContent='Source images loaded';
+    els.exportDescription.textContent=`${items.length} image${items.length===1?'':'s'} · ${humanSize(items.reduce((sum,x)=>sum+x.file.size,0))}. Generate to create your 3D mesh.`;
+    setViewportState('IMAGE LOADED','SOURCE READY'); showToast(`${items.length} reference image${items.length===1?'':'s'} loaded`);
+  }).catch(err=>showToast(err.message,true));
 }
-els.dropZone.addEventListener('click', (event) => { if (event.target === els.fileInput || event.target.closest('#removeImage')) return; els.fileInput.click(); });
-els.dropZone.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); els.fileInput.click(); } });
-els.fileInput.addEventListener('change', () => { setImage(els.fileInput.files?.[0]); els.fileInput.value = ''; });
-for (const type of ['dragenter', 'dragover']) els.dropZone.addEventListener(type, (event) => { event.preventDefault(); els.dropZone.classList.add('dragover'); });
-for (const type of ['dragleave', 'drop']) els.dropZone.addEventListener(type, (event) => { event.preventDefault(); els.dropZone.classList.remove('dragover'); });
-els.dropZone.addEventListener('drop', (event) => setImage(event.dataTransfer?.files?.[0]));
+els.dropZone.addEventListener('click',(event)=>{if(event.target===els.fileInput||event.target.closest('#removeImage'))return;els.fileInput.click();});
+els.dropZone.addEventListener('keydown',(event)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();els.fileInput.click();}});
+els.fileInput.addEventListener('change',()=>{setImages(els.fileInput.files);els.fileInput.value='';});
+for(const type of ['dragenter','dragover'])els.dropZone.addEventListener(type,event=>{event.preventDefault();els.dropZone.classList.add('dragover');});
+for(const type of ['dragleave','drop'])els.dropZone.addEventListener(type,event=>{event.preventDefault();els.dropZone.classList.remove('dragover');});
+els.dropZone.addEventListener('drop',event=>setImages(event.dataTransfer?.files));
 els.removeImage.addEventListener('click', (event) => {
   event.stopPropagation();
-  selectedFile = null; sourceDataUrl = null; activeTaskId = null; generatedModelUrl = null; isGenerating = false;
-  els.sourceImage.removeAttribute('src'); els.uploadPreview.classList.add('hidden'); els.uploadPrompt.classList.remove('hidden');
+  selectedFiles = []; sourceDataUrls = []; activeTaskId = null; generatedModelUrl = null; isGenerating = false;
+  els.sourceImagesPreview.replaceChildren(); els.uploadPreview.classList.add('hidden'); els.uploadPrompt.classList.remove('hidden');
   els.generateButton.disabled = true; els.exportButton.disabled = true;
   els.exportTitle.textContent = 'Your model will appear here'; els.exportDescription.textContent = 'Generate to unlock your GLB export.';
   els.buttonCaption.textContent = 'ADD AN IMAGE TO BEGIN'; setViewportState('STANDBY', 'NO MESH LOADED');
@@ -242,7 +243,7 @@ function loadModel(modelUrl) {
 function modelUrlOrAbsolute(url) { return new URL(url, window.location.href).href; }
 
 async function generateModel() {
-  if (!selectedFile || !sourceDataUrl || isGenerating) return;
+  if (!selectedFiles.length || isGenerating) return;
   isGenerating = true;
   currentProgress = 4;
   const taskId = `job-${Date.now()}`;
@@ -275,7 +276,7 @@ async function generateModel() {
   try {
     els.scanStatusText.textContent = 'RUNNING ON YOUR MAC';
     const form = new FormData();
-    form.append('image', selectedFile, selectedFile.name);
+    selectedFiles.forEach(file => form.append('images', file, file.name));
     form.append('quality', selectedQuality);
     form.append('texture', String(els.textureToggle.checked));
     form.append('pbr', String(els.pbrToggle.checked));
@@ -286,7 +287,7 @@ async function generateModel() {
     if (taskId !== activeTaskId) return;
     if (!payload.modelUrl) throw new Error('The local engine finished without returning a GLB file. Check the terminal output.');
     generatedModelUrl = payload.modelUrl;
-    generatedModelName = (selectedFile.name.replace(/\.[^.]+$/, '') || 'formforge-model') + '.glb';
+    generatedModelName = (selectedFiles[0].name.replace(/\.[^.]+$/, '') || 'formforge-model') + '.glb';
     currentProgress = 100;
     els.scanProgress.textContent = '100%';
     els.scanStatusText.textContent = 'LOADING YOUR MODEL';
@@ -329,7 +330,7 @@ function failGeneration(message) {
   if (pollTimer) clearTimeout(pollTimer);
   els.scanOverlay.classList.add('hidden');
   els.emptyState.classList.toggle('hidden', Boolean(loadedModel));
-  els.generateButton.disabled = !selectedFile;
+  els.generateButton.disabled = !selectedFiles.length;
   els.generateButtonText.textContent = loadedModel ? 'REGENERATE MODEL' : 'TRY AGAIN';
   els.buttonCaption.textContent = 'PLEASE TRY AGAIN';
   els.exportTitle.textContent = loadedModel ? 'Previous model still available' : 'Generation did not finish';
@@ -338,28 +339,10 @@ function failGeneration(message) {
   showToast(message, true);
 }
 
-els.exportButton.addEventListener('click', async () => {
+els.exportButton.addEventListener('click', () => {
   if (!generatedModelUrl) return;
-  try {
-    const response = await fetch(generatedModelUrl);
-    if (!response.ok) throw new Error('Download is temporarily unavailable.');
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = generatedModelName || 'formforge-model.glb';
-    document.body.appendChild(link); link.click(); link.remove();
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
-    showToast('Your GLB download has started.');
-  } catch {
-    // The hosted provider normally serves a direct attachment link; use it if CORS blocks a blob download.
-    const link = document.createElement('a');
-    link.href = generatedModelUrl;
-    link.target = '_blank';
-    link.rel = 'noopener';
-    document.body.appendChild(link); link.click(); link.remove();
-    showToast('Opening your model download.');
-  }
+  const link=document.createElement('a'); link.href=generatedModelUrl; link.download=generatedModelName||'formforge-model.glb';
+  document.body.appendChild(link); link.click(); link.remove(); showToast('Your GLB download has started.');
 });
 els.resetView.addEventListener('click', () => {
   camera.position.set(4.2, 2.7, 5.7); controls.target.set(0, 0.35, 0); controls.update();
