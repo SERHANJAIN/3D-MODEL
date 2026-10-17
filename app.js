@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { Client, handle_file } from '@gradio/client';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -17,39 +16,6 @@ const els = {
 };
 const generateArea = $('generateArea');
 if (generateArea) generateArea.append(els.generateButton, els.buttonCaption);
-
-const HF_SPACE = 'tencent/Hunyuan3D-2.1';
-const HF_SPACE_BASE = 'https://tencent-hunyuan3d-2-1.hf.space';
-let hfClientPromise = null;
-function getHFClient() {
-  if (!hfClientPromise) hfClientPromise = Client.connect(HF_SPACE);
-  return hfClientPromise;
-}
-function resolveFileUrl(value) {
-  if (!value) return null;
-  if (Array.isArray(value)) {
-    for (const item of value) { const result = resolveFileUrl(item); if (result) return result; }
-    return null;
-  }
-  if (typeof value === 'object') {
-    // Gradio FileData responses vary by version: accept url, path, and nested value/data shapes.
-    for (const key of ['url', 'path', 'value', 'data', 'name']) {
-      if (value[key]) {
-        const result = resolveFileUrl(value[key]);
-        if (result) return result;
-      }
-    }
-    return null;
-  }
-  if (typeof value !== 'string') return null;
-  if (/^https?:\/\//i.test(value)) return value;
-  if (value.startsWith('/gradio_api/file=')) return HF_SPACE_BASE + value;
-  if (value.startsWith('/file=')) return HF_SPACE_BASE + '/gradio_api' + value;
-  if (value.startsWith('/static/')) return HF_SPACE_BASE + value;
-  if (value.startsWith('/')) return `${HF_SPACE_BASE}/gradio_api/file=${value}`;
-  if (/\.glb(?:$|\?)/i.test(value)) return `${HF_SPACE_BASE}/gradio_api/file=${value}`;
-  return null;
-}
 
 let selectedFile = null;
 let sourceDataUrl = null;
@@ -150,10 +116,18 @@ function showToast(message, isError = false) {
   toastTimer = setTimeout(() => els.toast.classList.remove('show'), 4200);
 }
 
-// The hosted public inference Space does the generation; no Node server or user API key is needed.
-window.formforgeConfigured = true;
-els.apiStatusText.textContent = 'READY';
+// FormForge uses a local Apple-Silicon engine. No cloud API key or shared quota.
+window.formforgeConfigured = false;
+els.apiStatusText.textContent = 'CHECKING LOCAL ENGINE';
 els.buttonCaption.textContent = 'ADD AN IMAGE TO BEGIN';
+fetch('/api/health').then((r) => { if (!r.ok) throw new Error('offline'); return r.json(); }).then((data) => {
+  window.formforgeConfigured = Boolean(data.ready);
+  els.apiStatusText.textContent = data.ready ? 'LOCAL ENGINE READY' : 'ENGINE STARTING';
+  if (els.modalApiStatus) els.modalApiStatus.textContent = data.ready ? 'Local engine is running on this Mac.' : 'Engine is running; model weights load when you generate.';
+}).catch(() => {
+  els.apiStatusText.textContent = 'OPEN LOCAL APP';
+  if (els.modalApiStatus) els.modalApiStatus.textContent = 'Open http://127.0.0.1:8765 and start the local engine first.';
+});
 
 function humanSize(bytes) { return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }
 function setImage(file) {
@@ -263,6 +237,8 @@ function loadModel(modelUrl) {
   });
 }
 
+function modelUrlOrAbsolute(url) { return new URL(url, window.location.href).href; }
+
 async function generateModel() {
   if (!selectedFile || !sourceDataUrl || isGenerating) return;
   isGenerating = true;
@@ -272,7 +248,7 @@ async function generateModel() {
   generatedModelUrl = null;
   els.generateButton.disabled = true;
   els.generateButtonText.textContent = 'GENERATING YOUR MODEL…';
-  els.buttonCaption.textContent = 'YOUR IMAGE IS BEING CONVERTED IN THE CLOUD';
+  els.buttonCaption.textContent = 'GENERATING LOCALLY ON YOUR MAC';
   els.emptyState.classList.add('hidden');
   els.scanOverlay.classList.remove('hidden');
   els.exportButton.disabled = true;
@@ -295,42 +271,28 @@ async function generateModel() {
   pollTimer = setTimeout(advanceProgress, 1800);
 
   try {
-    const client = await getHFClient();
+    els.scanStatusText.textContent = 'RUNNING ON YOUR MAC';
+    const form = new FormData();
+    form.append('image', selectedFile, selectedFile.name);
+    form.append('quality', selectedQuality);
+    form.append('texture', String(els.textureToggle.checked));
+    form.append('pbr', String(els.pbrToggle.checked));
+    form.append('material_prompt', els.materialPrompt.value.trim());
+    const response = await fetch('/api/generate', { method: 'POST', body: form });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || 'Local generation failed. Check the terminal window for details.');
     if (taskId !== activeTaskId) return;
-    els.scanStatusText.textContent = 'SENDING IMAGE TO AI';
-    const imageInput = await handle_file(selectedFile);
-    // predict() resolves to the API response data array; submit() is an async iterator.
-    els.scanStatusText.textContent = 'BUILDING 3D GEOMETRY';
-    const result = await client.predict('/generation_all', [
-      null, imageInput, null, null, null, null,
-      5, 5.0, Math.floor(Math.random() * 1000000), 256, true, 8000, true
-    ]);
-    if (taskId !== activeTaskId) return;
-    const output = Array.isArray(result) ? result : (result?.data || result?.output || []);
-    // generation_all returns: untextured mesh file, textured GLB file, preview HTML, stats, seed.
-    // Scan the returned file objects rather than assuming one exact Gradio FileData version.
-    let modelUrl = resolveFileUrl(output[1]);
-    if (!modelUrl) modelUrl = resolveFileUrl(output[0]);
-    if (!modelUrl) {
-      const diagnostic = output.map((item) => {
-        if (typeof item === 'string') return item.slice(0, 100);
-        if (item && typeof item === 'object') return Object.keys(item).join(',');
-        return String(item);
-      }).join(' | ');
-      throw new Error(`The AI service returned no usable file URL. Response fields: ${diagnostic || 'empty response'}. The shared AI service may have changed its output format or be temporarily unavailable.`);
-    }
-    generatedModelUrl = modelUrl;
-    generatedModelName = (selectedFile.name.replace(/\.[^.]+$/, '') || 'formforge-model') + '.glb';
+    if (!payload.modelUrl) throw new Error('The local engine finished without returning a GLB file. Check the terminal output.');
+    generatedModelUrl = payload.modelUrl;
+    generatedModelName = (selectedFile.name.replace(/\\.[^.]+$/, '') || 'formforge-model') + '.glb';
     currentProgress = 100;
     els.scanProgress.textContent = '100%';
     els.scanStatusText.textContent = 'LOADING YOUR MODEL';
-    await installGeneratedModel(modelUrl, taskId);
+    await installGeneratedModel(modelUrlOrAbsolute(payload.modelUrl), taskId);
   } catch (error) {
     if (taskId !== activeTaskId) return;
-    const detail = error?.message || 'The free AI service is busy right now. Please try again in a moment.';
-    failGeneration(/quota|zerogpu|queue|busy|rate limit/i.test(detail)
-      ? 'The free AI generator is busy or has reached its shared daily limit. Please try again later.'
-      : detail);
+    const detail = error?.message || 'Local generation failed. Check the terminal window for details.';
+    failGeneration(detail);
   }
 }
 els.generateButton.addEventListener('click', generateModel);
