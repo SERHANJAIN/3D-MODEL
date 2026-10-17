@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: formforge-image-to-3d-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/config
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: MESHY_API_KEY
+        sync: false
+      - key: FRONTEND_ORIGINS
+        value: "https://serhanjain.github.io,http://localhost:3000,http://127.0.0.1:3000"
