@@ -31,3 +31,9 @@ Setup requires Python 3.10+, Git, and roughly 25 GB of free disk space. The firs
 Apple Silicon MLX port of Hunyuan3D-2.1: https://github.com/dgrauet/Hunyuan3D-2.1-mlx
 
 The public GitHub Pages URL is only the static interface. For generation without a cloud API, open the local address above instead.
+
+
+## Quality and multiple reference photos
+- Choose **Low**, **Medium**, **High**, or **Extremely High**. Higher settings use more inference steps and mesh resolution, so they take longer and use more memory.
+- Upload up to four JPG/PNG/WebP photos of the same object. The current MLX shape model accepts one image, so the app arranges selected views into a contact sheet; this is a reference aid, **not true multi-view reconstruction**, and results may vary.
+- For the fastest result, choose **Low** and turn off photorealistic texture. GLB downloads use a direct same-origin download instead of buffering the entire file in browser memory.
