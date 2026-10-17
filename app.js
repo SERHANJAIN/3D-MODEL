@@ -32,19 +32,20 @@ function resolveFileUrl(value) {
     return null;
   }
   if (typeof value === 'object') {
-    if (value.url) return resolveFileUrl(value.url);
-    if (value.path) return resolveFileUrl(value.path);
-    if (value.value) return resolveFileUrl(value.value);
-    if (value.data) return resolveFileUrl(value.data);
+    // Gradio FileData responses vary by version: accept url, path, and nested value/data shapes.
+    for (const key of ['url', 'path', 'value', 'data', 'name']) {
+      if (value[key]) {
+        const result = resolveFileUrl(value[key]);
+        if (result) return result;
+      }
+    }
     return null;
   }
   if (typeof value !== 'string') return null;
   if (/^https?:\/\//i.test(value)) return value;
-  // Gradio File outputs may already contain the file-serving route in their URL.
   if (value.startsWith('/gradio_api/file=')) return HF_SPACE_BASE + value;
   if (value.startsWith('/file=')) return HF_SPACE_BASE + '/gradio_api' + value;
   if (value.startsWith('/static/')) return HF_SPACE_BASE + value;
-  // Raw server file paths (e.g. /tmp/gradio/...) are served using this route.
   if (value.startsWith('/')) return `${HF_SPACE_BASE}/gradio_api/file=${value}`;
   if (/\.glb(?:$|\?)/i.test(value)) return `${HF_SPACE_BASE}/gradio_api/file=${value}`;
   return null;
@@ -306,10 +307,18 @@ async function generateModel() {
     ]);
     if (taskId !== activeTaskId) return;
     const output = Array.isArray(result) ? result : (result?.data || result?.output || []);
-    // generation_all returns the textured GLB as its second file output.
+    // generation_all returns: untextured mesh file, textured GLB file, preview HTML, stats, seed.
+    // Scan the returned file objects rather than assuming one exact Gradio FileData version.
     let modelUrl = resolveFileUrl(output[1]);
     if (!modelUrl) modelUrl = resolveFileUrl(output[0]);
-    if (!modelUrl) throw new Error('The AI service finished but did not return a downloadable model. Please try again.');
+    if (!modelUrl) {
+      const diagnostic = output.map((item) => {
+        if (typeof item === 'string') return item.slice(0, 100);
+        if (item && typeof item === 'object') return Object.keys(item).join(',');
+        return String(item);
+      }).join(' | ');
+      throw new Error(`The AI service returned no usable file URL. Response fields: ${diagnostic || 'empty response'}. The shared AI service may have changed its output format or be temporarily unavailable.`);
+    }
     generatedModelUrl = modelUrl;
     generatedModelName = (selectedFile.name.replace(/\.[^.]+$/, '') || 'formforge-model') + '.glb';
     currentProgress = 100;
