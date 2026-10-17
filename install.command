@@ -19,7 +19,7 @@ command -v git >/dev/null 2>&1 || { echo "Git is required. Install Xcode Command
 [ -d .venv ] || "$PYTHON" -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip wheel
-python -m pip install fastapi uvicorn python-multipart mlx mlx-arsenal safetensors Pillow trimesh scikit-image PyMCubes scipy huggingface_hub hf_xet xatlas opencv-python numpy pyyaml einops transformers diffusers accelerate
+python -m pip install fastapi uvicorn python-multipart mlx mlx-arsenal safetensors Pillow trimesh scikit-image PyMCubes scipy 'numpy<2' huggingface_hub hf_xet xatlas opencv-python pyyaml einops transformers==4.46.0 diffusers==0.30.0 accelerate pytorch-lightning imageio pandas rembg realesrgan pymeshlab pygltflib omegaconf configargparse tqdm psutil timm torchdiffeq torchmetrics basicsr
 python -m pip install torch torchvision
 mkdir -p .local-engine
 if [ ! -d .local-engine/Hunyuan3D-2.1-mlx/.git ]; then
