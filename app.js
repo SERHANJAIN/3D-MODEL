@@ -117,8 +117,9 @@ function showToast(message, isError = false) {
 }
 
 // FormForge uses a local Apple-Silicon engine. No cloud API key or shared quota.
+const isLocalFormForge = ['localhost', '127.0.0.1'].includes(window.location.hostname);
 window.formforgeConfigured = false;
-els.apiStatusText.textContent = 'CHECKING LOCAL ENGINE';
+els.apiStatusText.textContent = isLocalFormForge ? 'CHECKING LOCAL ENGINE' : 'LOCAL ENGINE REQUIRED';
 els.buttonCaption.textContent = 'ADD AN IMAGE TO BEGIN';
 fetch('/api/health').then((r) => { if (!r.ok) throw new Error('offline'); return r.json(); }).then((data) => {
   window.formforgeConfigured = Boolean(data.ready);
@@ -143,8 +144,9 @@ function setImage(file) {
     els.sourceImage.src = sourceDataUrl;
     els.uploadPrompt.classList.add('hidden');
     els.uploadPreview.classList.remove('hidden');
-    els.generateButton.disabled = false;
-    els.buttonCaption.textContent = 'READY TO GENERATE';
+    const onLocalApp = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    els.generateButton.disabled = !onLocalApp;
+    els.buttonCaption.textContent = onLocalApp ? 'READY TO GENERATE' : 'OPEN THE LOCAL APP TO GENERATE';
     els.exportTitle.textContent = 'Source loaded';
     els.exportDescription.textContent = `${file.name} · ${humanSize(file.size)}. Generate to create your 3D mesh.`;
     setViewportState('IMAGE LOADED', 'SOURCE READY');
