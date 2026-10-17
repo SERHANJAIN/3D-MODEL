@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f4f0">
-  <meta name="description" content="Upload a picture, generate a photorealistic 3D model, and download it as a GLB. Free local AI engine available for Mac.">
+  <meta name="description" content="Upload up to 4 reference photos, generate a 3D model, and download a GLB. Free local AI engine available for Mac.">
     <title>FormForge — Photo to 3D</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -44,18 +44,18 @@
         <aside class="panel source-panel">
           <div class="panel-heading">
             <div><span class="panel-index">01</span><h2>Source image</h2></div>
-            <span class="tiny-counter">INPUT</span>
+            <span class="tiny-counter">UP TO 4 VIEWS</span>
           </div>
           <div class="upload-zone" id="dropZone" role="button" tabindex="0" aria-label="Choose or drop an image">
-            <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+            <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
             <div class="upload-content" id="uploadPrompt">
               <div class="upload-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-              <strong>Drop your image here</strong>
-              <span>or <u>browse files</u></span>
+              <strong>Drop up to 4 photos here</strong>
+              <span>or <u>browse files</u> · same object, different angles</span>
               <div class="file-pills"><span>JPG</span><span>PNG</span><span>WEBP</span></div>
             </div>
             <div class="upload-preview hidden" id="uploadPreview">
-              <img id="sourceImage" alt="Uploaded source reference">
+              <div id="sourceImagesPreview" class="source-images-preview" aria-label="Selected reference images"></div>
               <div class="image-overlay"><span class="file-ready"><span class="status-dot"></span> IMAGE READY</span><button type="button" id="removeImage" class="remove-image" aria-label="Remove image">×</button></div>
             </div>
           </div>
@@ -64,7 +64,7 @@
           <div class="mini-heading">BETTER INPUT. BETTER GEOMETRY.</div>
           <div class="tip-row"><span class="tip-number">A</span><p>Show the whole object, clearly separated from its background.</p></div>
           <div class="tip-row"><span class="tip-number">B</span><p>Use a sharp, well-lit image with visible material details.</p></div>
-          <div class="tip-row"><span class="tip-number">C</span><p>A single view estimates hidden surfaces; add views when precision matters.</p></div>
+          <div class="tip-row"><span class="tip-number">C</span><p>Add up to 4 views of the same object. The current model uses a contact sheet, not true multi-view reconstruction.</p></div>
           <div class="source-bottom"><span class="micro-icon">✳</span><span>YOUR IMAGE IS PROCESSED LOCALLY ON THIS MAC.</span></div>
         </aside>
 
@@ -77,7 +77,7 @@
             <canvas id="modelCanvas" aria-label="Interactive 3D model. Drag to orbit and scroll to zoom."></canvas>
             <div class="empty-state" id="emptyState">
               <div class="empty-orbit orbit-one"></div><div class="empty-orbit orbit-two"></div>
-              <div class="empty-copy"><div class="empty-glyph">◈</div><span class="empty-kicker">YOUR CANVAS IS READY</span><strong>Every angle.<br><em>Every detail.</em></strong><p>Upload a photo to turn it into a 3D model.</p></div>
+              <div class="empty-copy"><div class="empty-glyph">◈</div><span class="empty-kicker">YOUR CANVAS IS READY</span><strong>Every angle.<br><em>Every detail.</em></strong><p>Upload up to 4 photos to turn them into a 3D model.</p></div>
             </div>
             <div class="scan-overlay hidden" id="scanOverlay"><div class="scan-ring scan-ring-a"></div><div class="scan-ring scan-ring-b"></div><div class="scan-line"></div><div class="scan-status"><span class="scan-spinner"></span><span id="scanStatusText">BUILDING GEOMETRY</span><strong id="scanProgress">0%</strong></div></div>
             <div class="viewport-bottom-left"><span class="axis-icon">✣</span><span>ORBIT <b>·</b> ZOOM <b>·</b> PAN</span></div>
@@ -97,12 +97,14 @@
             <span class="settings-sliders">☷</span>
           </div>
           <div class="setting-block">
-            <div class="field-label"><label for="qualitySelect">GEOMETRY DETAIL</label><span class="recommended">RECOMMENDED</span></div>
+            <div class="field-label"><label for="qualitySelect">QUALITY / SPEED</label><span class="recommended">MEDIUM DEFAULT</span></div>
             <div class="quality-options" role="group" aria-label="Geometry detail">
-              <button class="quality-option" type="button" data-quality="2k" aria-pressed="true"><span class="quality-top">2K</span><span class="quality-bottom">HIGH DETAIL</span><span class="quality-check">✓</span></button>
-              <button class="quality-option" type="button" data-quality="4k" aria-pressed="false"><span class="quality-top">4K</span><span class="quality-bottom">ULTRA DETAIL</span><span class="quality-check">✓</span></button>
+              <button class="quality-option" type="button" data-quality="low" aria-pressed="false"><span class="quality-top">LOW</span><span class="quality-bottom">FASTEST</span><span class="quality-check">✓</span></button>
+              <button class="quality-option" type="button" data-quality="medium" aria-pressed="true"><span class="quality-top">MEDIUM</span><span class="quality-bottom">BALANCED</span><span class="quality-check">✓</span></button>
+              <button class="quality-option" type="button" data-quality="high" aria-pressed="false"><span class="quality-top">HIGH</span><span class="quality-bottom">MORE DETAIL</span><span class="quality-check">✓</span></button>
+              <button class="quality-option" type="button" data-quality="extreme" aria-pressed="false"><span class="quality-top">EXTREMELY HIGH</span><span class="quality-bottom">SLOWEST</span><span class="quality-check">✓</span></button>
             </div>
-            <p class="field-help">Higher geometry resolution can preserve finer shape detail and may take longer.</p>
+            <p class="field-help">Low is fastest; Extremely High takes longest and may use more memory. Quality controls generation, not just download size.</p>
           </div>
           <div class="setting-divider"></div>
           <div class="setting-block">
