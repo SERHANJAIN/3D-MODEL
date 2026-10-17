@@ -286,7 +286,7 @@ async function generateModel() {
     if (taskId !== activeTaskId) return;
     if (!payload.modelUrl) throw new Error('The local engine finished without returning a GLB file. Check the terminal output.');
     generatedModelUrl = payload.modelUrl;
-    generatedModelName = (selectedFile.name.replace(/\\.[^.]+$/, '') || 'formforge-model') + '.glb';
+    generatedModelName = (selectedFile.name.replace(/\.[^.]+$/, '') || 'formforge-model') + '.glb';
     currentProgress = 100;
     els.scanProgress.textContent = '100%';
     els.scanStatusText.textContent = 'LOADING YOUR MODEL';
