@@ -15,6 +15,13 @@ const els = {
   helpModal: $('helpModal'), closeHelp: $('closeHelp'), modalApiStatus: $('modalApiStatus')
 };
 
+const API_BASE = (document.querySelector('meta[name="formforge-api-base"]')?.content || '').trim().replace(/\/+$/, '');
+function apiUrl(path) {
+  const cleanPath = String(path).replace(/^\/+/, '');
+  if (API_BASE) return new URL(cleanPath, API_BASE + '/').toString();
+  return new URL(cleanPath, document.baseURI).toString();
+}
+
 let selectedFile = null;
 let sourceDataUrl = null;
 let selectedQuality = '2k';
@@ -114,25 +121,33 @@ function showToast(message, isError = false) {
 
 async function checkConfig() {
   try {
-    const r = await fetch('/api/config');
-    const cfg = await r.json();
+    const response = await fetch(apiUrl('api/config'), { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`API status ${response.status}`);
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) throw new Error('The API did not return JSON.');
+    const cfg = await response.json();
     const status = document.querySelector('.saved-state');
     if (cfg.configured) {
       els.apiStatusText.textContent = 'ENGINE CONNECTED';
       status.classList.remove('config-error');
-      els.modalApiStatus.textContent = 'Meshy API key detected. Generation is enabled.';
+      els.modalApiStatus.textContent = 'Meshy is connected. Image-to-3D generation and GLB export are enabled.';
       els.buttonCaption.textContent = selectedFile ? 'READY TO BUILD · PROVIDER CREDITS APPLY' : 'ADD AN IMAGE TO BEGIN';
+      window.formforgeConfigured = true;
     } else {
-      els.apiStatusText.textContent = 'ENGINE NOT CONNECTED';
+      els.apiStatusText.textContent = 'ADD API KEY';
       status.classList.add('config-error');
-      els.modalApiStatus.textContent = 'No Meshy API key detected. Add it to .env to enable generation.';
-      els.buttonCaption.textContent = selectedFile ? 'CONNECT MESHY API TO GENERATE' : 'ADD AN IMAGE TO BEGIN';
+      els.modalApiStatus.textContent = 'The API server is reachable, but MESHY_API_KEY has not been configured on that server.';
+      els.buttonCaption.textContent = selectedFile ? 'ADD MESHY API KEY ON THE SERVER' : 'ADD AN IMAGE TO BEGIN';
+      window.formforgeConfigured = false;
     }
-    window.formforgeConfigured = Boolean(cfg.configured);
   } catch {
-    els.apiStatusText.textContent = 'SERVER OFFLINE';
+    const pagesOnly = location.hostname.endsWith('github.io') && !API_BASE;
+    els.apiStatusText.textContent = pagesOnly ? 'API NOT DEPLOYED' : 'SERVER OFFLINE';
     document.querySelector('.saved-state').classList.add('config-error');
-    els.modalApiStatus.textContent = 'Could not reach the local server. Start it with npm start.';
+    els.modalApiStatus.textContent = pagesOnly
+      ? 'GitHub Pages serves the frontend only. Deploy server.js to a Node host, add MESHY_API_KEY as a server secret, then set the formforge-api-base meta tag to the deployed URL.'
+      : 'Could not reach the generation API. Start the Node server with npm start, or check the API URL configured in index.html.';
+    els.buttonCaption.textContent = selectedFile ? 'CONNECT THE GENERATION API TO BUILD' : 'ADD AN IMAGE TO BEGIN';
     window.formforgeConfigured = false;
   }
 }
@@ -223,7 +238,7 @@ function fmtCount(n) { return n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n 
 function loadModel(taskId) {
   return new Promise((resolve, reject) => {
     const loader = new GLTFLoader();
-    loader.load(`/api/model/${encodeURIComponent(taskId)}`, (gltf) => {
+    loader.load(apiUrl(`api/model/${encodeURIComponent(taskId)}`), (gltf) => {
       const model = gltf.scene;
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
@@ -263,7 +278,7 @@ async function generateModel() {
   setViewportState('GENERATING', 'BUILDING GEOMETRY');
   els.scanStatusText.textContent = 'BUILDING GEOMETRY';
   try {
-    const response = await fetch('/api/generate', {
+    const response = await fetch(apiUrl('api/generate'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ imageData: sourceDataUrl, quality: selectedQuality, texturePrompt: els.materialPrompt.value.trim(), texture: els.textureToggle.checked, pbr: els.pbrToggle.checked })
     });
@@ -281,7 +296,7 @@ els.generateButton.addEventListener('click', generateModel);
 async function pollTask(taskId) {
   if (!isGenerating || taskId !== activeTaskId) return;
   try {
-    const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`);
+    const response = await fetch(apiUrl(`api/tasks/${encodeURIComponent(taskId)}`));
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Could not check task status.');
     const reported = Math.max(0, Math.min(100, Number(data.progress || 0)));
@@ -343,7 +358,7 @@ function failGeneration(message) {
 els.exportButton.addEventListener('click', () => {
   if (!activeTaskId) return;
   const link = document.createElement('a');
-  link.href = `/api/model/${encodeURIComponent(activeTaskId)}?download=1`;
+  link.href = apiUrl(`api/model/${encodeURIComponent(activeTaskId)}?download=1`);
   link.download = `formforge-${activeTaskId}.glb`;
   document.body.appendChild(link); link.click(); link.remove();
   showToast('Your GLB download has started.');
