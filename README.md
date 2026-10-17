@@ -1,45 +1,59 @@
 # FormForge Studio — Image to 3D
 
-A dark, responsive image-to-3D workspace with image upload, a real-time Three.js viewer, high-detail Meshy generation, and GLB export.
+FormForge turns a reference image into a detailed, textured 3D asset and lets you inspect and export the resulting GLB.
 
-## What works
+## Repository layout
 
-- Drag-and-drop or browse for PNG, JPG/JPEG, and WebP images (up to 20 MB).
-- Choose **2K High Detail** or **4K Ultra Detail** generation.
-- Optional surface/material direction prompt.
-- Polls real Meshy task progress, loads the resulting GLB in an interactive 3D viewer, and exports the original GLB through the server.
-- Orbit, zoom, reset camera, and auto-rotate controls.
-- API key is stored on the server in `.env`; it is never placed in browser JavaScript.
-- Displays an honest setup state until the API key is configured.
+The browser files intentionally live at the **repository root** so they work with GitHub's web uploader and GitHub Pages. Keep `index.html`, `styles.css`, and `app.js` side by side; do not move them into `public/`.
 
-## Start locally
+- `index.html` — workspace UI and API-base configuration
+- `styles.css` — responsive studio design
+- `app.js` — image upload, Three.js preview, generation progress, and export
+- `server.js` — secure Meshy API proxy (server-side key only)
+- `.env.example` — local environment template
+- `render.yaml` — Render API service blueprint
 
-Requires Node.js 20 or newer.
+The frontend uses relative asset paths (`./styles.css` and `./app.js`) so the site's `/3D-MODEL/` project path is respected rather than incorrectly looking for files at the domain root.
+
+## Important: GitHub Pages cannot run the AI backend
+
+GitHub Pages hosts the static interface and 3D preview. AI generation and GLB downloads require `server.js` to run on a Node.js host.
+
+### Deploy the backend
+
+1. Create a key on the [Meshy developer platform](https://www.meshy.ai/).
+2. Open [Render](https://render.com/) and create a **Blueprint** from this repository using `render.yaml`, or create a Node web service manually with build command `npm install` and start command `npm start`.
+3. Add `MESHY_API_KEY` as a private environment secret. Do not put your key in `index.html` or `app.js`. The blueprint prompts for the key and permits the GitHub Pages origin via `FRONTEND_ORIGINS`.
+4. Copy your deployed service base URL (such as `https://your-service.onrender.com`) and replace the empty `formforge-api-base` meta tag in `index.html` with:
+   ```html
+   <meta name="formforge-api-base" content="https://your-service.onrender.com">
+   ```
+   Do **not** add `/api` to the end. The browser code adds the endpoint path automatically.
+5. Commit the HTML update. When GitHub Pages redeploys, refresh the site. The top status should report **ENGINE CONNECTED** when the API and secret are configured.
+
+### Run locally
+
+Requires Node.js 20 or newer. Copy `.env.example` to `.env`, set `MESHY_API_KEY`, then run:
 
 ```bash
-cp .env.example .env
-# Edit .env and set MESHY_API_KEY to your key
 npm install
 npm start
 ```
 
-Open `http://localhost:3000`.
+Open [http://localhost:3000](http://localhost:3000).
 
-Get a provider API key from [Meshy](https://www.meshy.ai/) / its developer platform. Generation uses the API credits associated with your Meshy account; check the provider's current pricing and limits before generating lots of assets.
+## Included features
 
-## High-detail behavior
+- PNG, JPG/JPEG, and WebP image upload (up to 20 MB)
+- 2K High Detail / 4K Ultra Detail options
+- Optional material direction prompt and texture/PBR toggles
+- Live Meshy task status and a Three.js model preview
+- Orbit, zoom, reset camera, and auto-rotate
+- GLB export streamed via the server
+- Server-side provider key, generation rate limiting, and allowlisted CORS origins
 
-The app uses Meshy `meshy-7.1`, with `geometry_resolution` and `texture_resolution` matched to the selected 2K or 4K quality, PBR enabled, and remeshing disabled to preserve detail. It asks for GLB as the output format. The service works asynchronously, so the UI polls until the task finishes. The actual mesh quality, fidelity to unseen surfaces, and generation time depend on the source image and provider model; a single photo cannot guarantee a perfect reconstruction of hidden geometry.
+Generation quality depends on the source image and the provider model. A single photo cannot reveal every hidden surface accurately. Provider credits may be charged for each generation; check current pricing before large batches.
 
-Source: [Meshy Image to 3D API docs](https://docs.meshy.ai/en/api/image-to-3d).
+## Before going public
 
-## Deploy
-
-Deploy the folder to any Node.js host that supports Node 20+. Configure `MESHY_API_KEY` as a server-side environment variable and `PORT` if your host provides one. Do not commit the `.env` file. The in-memory task allowlist is designed for a single-instance starter app; use a database/session-backed ownership model before running a public multi-user service behind multiple instances.
-
-## Security and production notes
-
-- The Express app adds security headers and rate-limits generation requests to reduce accidental spend.
-- Do not expose the API key to the browser, commit it to Git, or share it in screenshots.
-- For a public service, add authentication, per-user quotas/billing, durable task storage, upload abuse controls, provider spend limits, and operational monitoring.
-- This is a starter application, not a hosted SaaS. You must provide and configure your own API account/key.
+Add authentication, per-user quotas, durable task ownership/storage, upload abuse controls, spending limits, and monitoring. The in-memory task allowlist in this starter app is intended for a single API instance.
