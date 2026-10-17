@@ -181,7 +181,7 @@ for (const type of ['dragleave', 'drop']) els.dropZone.addEventListener(type, (e
 els.dropZone.addEventListener('drop', (event) => setImage(event.dataTransfer?.files?.[0]));
 els.removeImage.addEventListener('click', (event) => {
   event.stopPropagation();
-  selectedFile = null; sourceDataUrl = null; activeTaskId = null; generatedModelUrl = null;
+  selectedFile = null; sourceDataUrl = null; activeTaskId = null; generatedModelUrl = null; isGenerating = false;
   els.sourceImage.removeAttribute('src'); els.uploadPreview.classList.add('hidden'); els.uploadPrompt.classList.remove('hidden');
   els.generateButton.disabled = true; els.exportButton.disabled = true;
   els.exportTitle.textContent = 'Your model will appear here'; els.exportDescription.textContent = 'Generate to unlock your GLB export.';
